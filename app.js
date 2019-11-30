@@ -2,12 +2,26 @@ const express    = require("express");
 const app        = express();
 const bodyParser = require("body-parser");
 const mongoose   = require("mongoose");
-const port       = 5002;
+const port       = 5001;
+const seedDB      = require("./seeds");
 const options    = {
     useNewUrlParser: true,
     useUnifiedTopology: true,
     useFindAndModify: true
 };
+const methodOverride = require("method-override");
+const Campground = require("./models/campground");
+const Comment = require("./models/comment");
+const passport = require("passport");
+const LocalStrategy = require("passport-local");
+const passportLocalMongoose = require('passport-local-mongoose');
+const User = require("./models/user");
+
+const commentRoutes = require("./routes/comments");
+const campgroundRoutes = require("./routes/campgrounds");
+const authRoutes = require("./routes/index");
+
+// seedDB();
 mongoose.connect("mongodb://localhost/yelp_camp", options, function(err){
     if(err) {
         throw err
@@ -16,14 +30,26 @@ mongoose.connect("mongodb://localhost/yelp_camp", options, function(err){
 })
 app.use(bodyParser.urlencoded({extended: true}));
 app.set("view engine", "ejs");
+app.use(express.static(__dirname + "/public"));
+app.use(methodOverride('_method'));
+app.use(require("express-session")({
+    secret: "Von isn't my real name",
+    resave: false,
+    saveUninitialized: false
+}));
 
-const campgroundSchema = new mongoose.Schema({
-    name: String,
-    image: String,
-    description: String
+
+app.use(passport.initialize());
+app.use(passport.session());
+passport.use(new LocalStrategy(User.authenticate()));
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
+
+//adds user to every route and template
+app.use(function(req, res, next){
+    res.locals.currentUser = req.user;
+    next();
 });
-
-const Campground = mongoose.model("Campground", campgroundSchema);
 
 // Campground.create({
 //         name: "Salmon Creek",
@@ -38,57 +64,9 @@ const Campground = mongoose.model("Campground", campgroundSchema);
 // });
 
 
-app.get("/", (req, res) => {
-    res.render("landing");
-});
-
-app.get("/campgrounds", (req, res) => {
-    Campground.find({}, function(err, allCampgrounds){
-        if(err) {
-            throw err
-        }else {
-            res.render("index", {campgrounds:allCampgrounds})
-        }
-    });
-});
-
-app.post("/campgrounds", (req, res) => {
-    let name = req.body.name;
-    let image = req.body.image;
-    let desc = req.body.description;
-    let newCampground = {name: name, image: image, description: desc};
-    Campground.create(newCampground, function(err, newlyCreated){
-        if(err){
-            throw err
-        } else {
-            res.redirect("/campgrounds");
-        }    
-    });
-});
-
-app.get("/campgrounds/new", (req, res) => {
-    res.render("new");
-});
-
-app.get("/campgrounds/:id", function(req, res) {
-    Campground.findById(req.params.id, function(err, foundCampground){
-        if(err){
-            throw err
-        } else {
-            res.render("show", {campground: foundCampground});
-        }
-    });
-});
-
-app.delete("/campground/:id", function(req, res){
-    Campground.deleteOnce(req.params.id, function(err, deletedCampground){
-        if(err){
-            throw err
-        } else {
-            res.redirect("/campgrounds");
-        }
-    })
-})
+app.use(authRoutes);
+app.use("/campgrounds/:id/comments", commentRoutes);
+app.use("/campgrounds", campgroundRoutes);
 
 app.set('port', process.env.PORT || port); // set express to use this port
 app.listen(port, () => {
