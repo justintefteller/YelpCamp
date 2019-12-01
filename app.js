@@ -20,6 +20,7 @@ const User = require("./models/user");
 const commentRoutes = require("./routes/comments");
 const campgroundRoutes = require("./routes/campgrounds");
 const authRoutes = require("./routes/index");
+const flash = require('connect-flash');
 
 // seedDB();
 mongoose.connect("mongodb://localhost/yelp_camp", options, function(err){
@@ -32,6 +33,7 @@ app.use(bodyParser.urlencoded({extended: true}));
 app.set("view engine", "ejs");
 app.use(express.static(__dirname + "/public"));
 app.use(methodOverride('_method'));
+app.use(flash());
 app.use(require("express-session")({
     secret: "Von isn't my real name",
     resave: false,
@@ -48,6 +50,8 @@ passport.deserializeUser(User.deserializeUser());
 //adds user to every route and template
 app.use(function(req, res, next){
     res.locals.currentUser = req.user;
+    res.locals.error = req.flash("error");
+    res.locals.success = req.flash("success");
     next();
 });
 

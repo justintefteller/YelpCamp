@@ -15,13 +15,14 @@ router.get("/", (req, res) => {
 
 router.post("/", middleware.isLoggedIn, (req, res) => {
     let name = req.body.name;
+    let price = req.body.price;
     let image = req.body.image;
     let desc = req.body.description;
     let author = {
         id: req.user._id,
         username: req.user.username
     }
-    let newCampground = {name: name, image: image, description: desc, author:author};
+    let newCampground = {name: name, price: price, image: image, description: desc, author:author};
 
     Campground.create(newCampground, function(err, newlyCreated){
         if(err){
@@ -38,8 +39,9 @@ router.get("/new", middleware.isLoggedIn, (req, res) => {
 
 router.get("/:id", function(req, res) {
     Campground.findById(req.params.id).populate("comments").exec(function(err, foundCampground){
-        if(err){
-            throw err
+        if(err || !foundCampground){
+            req.flash('error', 'Campground not found');
+            res.redirect("back");
         } else {
             res.render("campgrounds/show", {campground: foundCampground});
         }
@@ -57,6 +59,7 @@ router.put("/:id", middleware.checkCampgroundOwnership, function(req, res){
         if(err){
             res.redirect('/campgrounds');
         }else {
+            req.flash("success", "Campground updated")
             res.redirect('/campgrounds/' + req.params.id);
         }
     });
